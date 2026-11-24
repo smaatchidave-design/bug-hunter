@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BugHunter — Spot &amp; Fix the Python Bug</title>
+<style>
+:root{
+  --bg:#060b1f; --panel:#0c1530; --panel2:#111d40; --line:#1f2e5c;
+  --text:#e8edff; --muted:#8c9bc7; --accent:#4cc9f0; --accent2:#7c5cff;
+  --good:#2ee59d; --bad:#ff5d73; --warn:#ffc857;
+  --mono:ui-monospace,"JetBrains Mono","Fira Code",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans);color:var(--text);min-height:100vh;
+  background:
+    radial-gradient(900px 500px at 12% -10%,rgba(124,92,255,.28),transparent 60%),
+    radial-gradient(800px 500px at 100% 0%,rgba(76,201,240,.18),transparent 55%),
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/40px 40px,
+    var(--bg);
+  background-attachment:fixed;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.app{max-width:1180px;margin:0 auto;padding:18px 20px 60px}
+
+/* top bar */
+.top{display:flex;justify-content:space-between;align-items:center;padding:6px 0 20px}
+.brand{display:flex;gap:11px;align-items:center;font-weight:800;font-size:20px;letter-spacing:-.02em}
+.logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:19px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));box-shadow:0 6px 26px rgba(76,201,240,.35)}
+.top-actions{display:flex;gap:8px}
+.chip{padding:8px 13px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);
+  font-size:13px;color:var(--muted);transition:.2s}
+.chip:hover{color:var(--text);border-color:var(--accent)}
+
+.screen{display:none}
+.screen.active{display:block;animation:rise .45s ease}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* start screen */
+.hero{text-align:center;padding:30px 0 10px}
+.eyebrow{display:inline-block;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);background:rgba(76,201,240,.1);border:1px solid rgba(76,201,240,.3)}
+.hero h1{font-size:clamp(40px,7vw,76px);line-height:1.02;letter-spacing:-.04em;margin:18px 0 14px;font-weight:900}
+.grad{background:linear-gradient(100deg,var(--accent) 0%,var(--accent2) 55%,#ff7ad9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:600px;margin:0 auto;color:var(--muted);font-size:18px;line-height:1.6}
+.hero-code{margin:30px auto 0;max-width:520px;text-align:left}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:34px 0 22px}
+.mode{padding:18px;border-radius:16px;text-align:left;background:var(--panel);border:1.5px solid var(--line);
+  transition:.2s;position:relative;overflow:hidden}
+.mode:hover{transform:translateY(-3px);border-color:#34498f}
+.mode.sel{border-color:var(--accent);box-shadow:0 0 0 4px rgba(76,201,240,.12),0 14px 40px rgba(0,0,0,.35);background:var(--panel2)}
+.mode .em{font-size:28px}
+.mode h3{margin:10px 0 4px;font-size:17px}
+.mode p{color:var(--muted);font-size:13px;line-height:1.5}
+.mode .meta{margin-top:12px;font-size:12px;color:var(--accent);font-weight:600}
+.cta{display:flex;flex-direction:column;align-items:center;gap:12px}
+.btn{padding:14px 28px;border-radius:14px;font-weight:700;font-size:16px;transition:.18s;display:inline-flex;gap:8px;align-items:center;justify-content:center}
+.btn.primary{background:linear-gradient(135deg,var(--accent2),#5a7bff 55%,var(--accent));color:#fff;
+  box-shadow:0 10px 30px rgba(124,92,255,.4)}
+.btn.primary:hover{transform:translateY(-2px);box-shadow:0 14px 38px rgba(124,92,255,.55)}
+.btn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn[disabled]{opacity:.4;cursor:not-allowed;transform:none!important}
+.best{font-size:13px;color:var(--muted)}
+.best b{color:var(--warn)}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:40px}
+.how div{padding:18px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--muted);font-size:14px;line-height:1.55}
+.how b{display:block;color:var(--text);margin-bottom:4px}
+.how .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--accent2);color:#fff;font-weight:800;font-size:13px;margin-bottom:10px}
+.kbd{font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:6px;background:#0a1230;border:1px solid var(--line);color:var(--text)}
+
+/* HUD */
+.hud{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hud-l,.hud-r{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{padding:8px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:14px;font-weight:600;display:flex;gap:7px;align-items:center}
+.pill small{color:var(--muted);font-weight:500}
+.diff{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:8px}
+.diff.easy{background:rgba(46,229,157,.14);color:var(--good)}
+.diff.medium{background:rgba(255,200,87,.14);color:var(--warn)}
+.diff.hard{background:rgba(255,93,115,.14);color:var(--bad)}
+.pop{animation:pop .35s ease}
+@keyframes pop{50%{transform:scale(1.18);color:var(--warn)}}
+.timer{height:7px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:16px}
+.timer i{display:block;height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .1s linear,background .3s}
+.timer.warn i{background:linear-gradient(90deg,#ff9f43,var(--warn))}
+.timer.crit i{background:linear-gradient(90deg,#ff3d6e,var(--bad))}
+
+/* main grid */
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.bar{display:flex;gap:7px;align-items:center;padding:12px 16px;background:#0a1230;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.bar i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
+.bar span{margin-left:8px;font-family:var(--mono)}
+.bar em{margin-left:auto;font-style:normal;font-size:12px;color:var(--warn)}
+#code{padding:12px 0;overflow-x:auto}
+.line{display:flex;font-family:var(--mono);font-size:15px;line-height:1.85;border-left:3px solid transparent;cursor:pointer;transition:background .12s;position:relative;min-width:max-content;width:100%}
+.line .ln{width:46px;flex:none;text-align:right;padding-right:16px;color:#43548a;user-select:none}
+.line .src{white-space:pre;padding-right:50px}
+.spot .line:hover{background:rgba(124,92,255,.14);border-left-color:var(--accent2)}
+.line.focus{background:rgba(76,201,240,.12);border-left-color:var(--accent)}
+.line.bug{background:rgba(255,200,87,.13);border-left-color:var(--warn)}
+.line.bug::after{content:"🐞";position:absolute;right:14px;top:0}
+.line.fixed{background:rgba(46,229,157,.12);border-left-color:var(--good);cursor:default}
+.line.fixed::after{content:"✔";position:absolute;right:16px;color:var(--good);font-weight:800}
+.line.wrong{animation:shake .4s;background:rgba(255,93,115,.2);border-left-color:var(--bad)}
+.fix .line,.done .line{cursor:default}
+.k{color:#c792ea}.s{color:#a5e075}.n{color:#f9a870}.c{color:#5d6f9f;font-style:italic}
+.f{color:#7ad7ff}.fn{color:#82aaff}.b{color:#ffd479}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.shake{animation:shake .4s}
+
+/* side */
+.side{display:flex;flex-direction:column;gap:14px}
+.mission{padding:18px 20px}
+.mission h2{font-size:21px;letter-spacing:-.02em;margin:10px 0 6px}
+.mission p{color:var(--muted);line-height:1.6;font-size:15px}
+.term .bar{padding:10px 14px}
+.term-b{padding:12px 16px 14px;font-family:var(--mono);font-size:13.5px;background:#050914}
+.tag{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:8px 0 5px}
+.tag.bad{color:var(--bad)}.tag.ok{color:var(--good)}.tag.exp{color:var(--good);margin-top:12px}
+.ol{color:#cdd6f6;opacity:0;animation:fadein .35s forwards;white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.ol.err{color:var(--bad)}
+@keyframes fadein{to{opacity:1}}
+#stage{padding:18px 20px}
+.prompt{display:flex;gap:12px;align-items:flex-start;line-height:1.55;font-size:15px}
+.prompt small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+.step{flex:none;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:var(--accent2);font-weight:800;font-size:14px}
+.opts{display:grid;gap:9px;margin-top:14px}
+.opt{display:flex;gap:12px;align-items:center;text-align:left;padding:11px 13px;border-radius:12px;background:#0a1230;border:1.5px solid var(--line);transition:.15s}
+.opt:hover:not([disabled]){border-color:var(--accent);transform:translateX(3px)}
+.opt .key{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:800;background:rgba(255,255,255,.07);color:var(--muted)}
+.opt pre{font-family:var(--mono);font-size:13.5px;line-height:1.55;overflow-x:auto;white-space:pre;flex:1}
+.opt.wrong{border-color:var(--bad);background:rgba(255,93,115,.1);animation:shake .4s}
+.opt.right{border-color:var(--good);background:rgba(46,229,157,.1)}
+.opt.out{opacity:.3;pointer-events:none;text-decoration:line-through}
+.opt[disabled]{cursor:default}
+.hintbox{margin-top:14px;padding:11px 14px;border-radius:12px;background:rgba(255,200,87,.09);border:1px dashed rgba(255,200,87,.5);color:#ffe3a0;font-size:14px;line-height:1.5}
+.why{margin-top:14px;padding:14px 16px;border-radius:14px;background:rgba(46,229,157,.08);border:1px solid rgba(46,229,157,.35);line-height:1.6;font-size:14.5px}
+.why.fail{background:rgba(255,93,115,.08);border-color:rgba(255,93,115,.4)}
+.why b{display:block;margin-bottom:4px}
+.why code{font-family:var(--mono);font-size:13px;background:rgba(255,255,255,.08);padding:1px 6px;border-radius:5px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 18px}
+.actions .btn{padding:11px 18px;font-size:14px;border-radius:12px}
+.hidden{display:none!important}
+
+/* end */
+.end{text-align:center;padding:20px 0}
+.rank-em{font-size:76px;animation:pop .6s}
+.end h2{font-size:clamp(30px,5vw,46px);letter-spacing:-.03em;margin:8px 0 4px}
+.end .sub{color:var(--muted);margin-bottom:26px}
+.big{font-size:clamp(46px,8vw,78px);font-weight:900;letter-spacing:-.04em}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:760px;margin:24px auto}
+.stat{padding:16px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.stat b{display:block;font-size:26px}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.rounds{max-width:760px;margin:0 auto 26px;text-align:left;display:grid;gap:8px}
+.rd{display:flex;gap:12px;align-items:center;padding:11px 15px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:14.5px}
+.rd .ic{width:24px;text-align:center}
+.rd small{margin-left:auto;color:var(--muted)}
+.end-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.newbest{display:inline-block;margin-bottom:10px;padding:6px 14px;border-radius:99px;background:rgba(255,200,87,.15);color:var(--warn);font-weight:700;font-size:13px}
+
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,30px);opacity:0;padding:12px 20px;border-radius:12px;background:#111d40;border:1px solid var(--accent);
+  font-weight:600;font-size:14px;z-index:60;transition:.25s;pointer-events:none;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.bad{border-color:var(--bad)}#toast.good{border-color:var(--good)}
+
+@media(max-width:940px){
+  .grid{grid-template-columns:1fr}
+  .modes{grid-template-columns:repeat(2,1fr)}
+  .how{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:520px){
+  .app{padding:12px 12px 50px}
+  .line{font-size:13px}.line .ln{width:36px;padding-right:10px}
+  .modes{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">🐞</div>BugHunter</div>
+    <div class="top-actions">
+      <button class="chip" id="soundBtn" aria-label="Toggle sound">🔊 Sound on</button>
+      <button class="chip hidden" id="quitBtn">✕ Quit</button>
+    </div>
+  </header>
+
+  <!-- START -->
+  <section id="start" class="screen active">
+    <div class="hero">
+      <span class="eyebrow">Python debugging arena</span>
+      <h1>Find the bug.<br><span class="grad">Ship the fix.</span></h1>
+      <p>Real Python snippets with real bugs. Spot the broken line, pick the right fix, and beat the clock before you run out of lives.</p>
+    </div>
+
+    <div class="modes" id="modes"></div>
+
+    <div class="cta">
+      <button class="btn primary" id="startBtn">▶ Start Hunting <span class="kbd" style="background:rgba(255,255,255,.18);border:0;color:#fff">Enter</span></button>
+      <div class="best">Your best score: <b id="bestScore">0</b></div>
+    </div>
+
+    <div class="how">
+      <div><span class="n">1</span><b>Spot it</b>Read the code and the output. Click the line that's causing the problem.</div>
+      <div><span class="n">2</span><b>Fix it</b>Choose the replacement that makes the program behave. Wrong guesses cost a ❤️.</div>
+      <div><span class="n">3</span><b>Stack combos</b>Clean catches build a streak multiplier. Faster fixes score more.<br><br><span class="kbd">↑</span> <span class="kbd">↓</span> <span class="kbd">Enter</span> <span class="kbd">1-4</span> <span class="kbd">H</span> hint</div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="screen">
+    <div class="hud">
+      <div class="hud-l">
+        <div class="pill"><small>Round</small><span id="roundTxt">1 / 5</span></div>
+        <span class="diff easy" id="diffTag">easy</span>
+      </div>
+      <div class="hud-r">
+        <div class="pill" title="Time left">⏱ <span id="timeTxt">45s</span></div>
+        <div class="pill" title="Streak multiplier">🔥 <span id="streakTxt">x1.0</span></div>
+        <div class="pill">⭐ <span id="scoreTxt">0</span></div>
+        <div class="pill" id="hearts" title="Lives"></div>
+      </div>
+    </div>
+    <div class="timer" id="timer"><i id="timerFill"></i></div>
+
+    <div class="grid">
+      <div class="card" id="editorCard">
+        <div class="bar"><i></i><i></i><i></i><span id="fileName">challenge.py</span><em id="phaseTag">🔎 Find the buggy line</em></div>
+        <div id="code" class="spot"></div>
+      </div>
+
+      <div class="side">
+        <div class="card mission">
+          <span class="diff easy" id="diffTag2">easy</span>
+          <h2 id="mTitle"></h2>
+          <p id="mBrief"></p>
+        </div>
+        <div class="card term" id="term"></div>
+        <div class="card">
+          <div id="stage"></div>
+          <div class="actions">
+            <button class="btn ghost" id="hintBtn">💡 Hint (−30)</button>
+            <button class="btn primary hidden" id="nextBtn">Next bug →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section id="end" class="screen">
+    <div class="end" id="endBox"></div>
+  </section>
+</div>
+
+<canvas id="fx"></canvas>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+
+/* ============ challenges ============ */
+const C = [
+ /* ---------- EASY ---------- */
+ { diff:'easy', file:'total.py', title:'The Disappearing Sum',
+   brief:'total() should add up every number in the list, but it keeps returning the wrong answer.',
+   code:`def total(nums):
+    result = 0
+    for n in nums:
+        result = n
+    return result
+
+print(total([1, 2, 3, 4]))`,
+   bug:3, buggy:['4'], expect:['10'],
+   hint:'Look at what happens to result on each loop pass. Is anything being accumulated?',
+   why:'<code>result = n</code> overwrites the total on every pass, so only the last number survives. <code>+=</code> adds to the running total.',
+   fixes:[{t:'result += n',ok:1},{t:'result =+ n'},{t:'result = result * n'},{t:'result -= n'}] },
+
+ { diff:'easy', file:'countdown.py', title:'Liftoff Failure',
+   brief:'The rocket should count down 3, 2, 1 and then launch. Mission control only sees the launch.',
+   code:`def countdown(n):
+    for i in range(n, 0):
+        print(i)
+    print("Liftoff!")
+
+countdown(3)`,
+   bug:1, buggy:['Liftoff!'], expect:['3','2','1','Liftoff!'],
+   hint:'range() counts upward by default. What happens when start is bigger than stop?',
+   why:'<code>range(3, 0)</code> is empty because the default step is +1. A step of <code>-1</code> counts down and stops before 0.',
+   fixes:[{t:'for i in range(n, 0, -1):',ok:1},{t:'for i in range(n, 0, 1):'},{t:'for i in range(0, n):'},{t:'for i in range(n):'}] },
+
+ { diff:'easy', file:'age.py', title:'Type Trouble',
+   brief:'Build a friendly sentence about someone\'s age. Python refuses to cooperate.',
+   code:`age = 25
+message = "I am " + age + " years old"
+print(message)`,
+   bug:1, buggy:['!TypeError: can only concatenate str (not "int") to str'], expect:['I am 25 years old'],
+   hint:'The + operator can join strings together, but it will not mix a string with an integer.',
+   why:'Python does not auto-convert numbers to text. <code>str(age)</code> turns 25 into <code>"25"</code> so concatenation works.',
+   fixes:[{t:'message = "I am " + str(age) + " years old"',ok:1},{t:'message = "I am " + age.str() + " years old"'},{t:'message = "I am " + int(age) + " years old"'},{t:'message = "I am ", age, " years old"'}] },
+
+ { diff:'easy', file:'square.py', title:'The Silent Function',
+   brief:'square(5) should hand back 25. Instead it hands back... nothing.',
+   code:`def square(x):
+    x * x
+
+print(square(5))`,
+   bug:1, buggy:['None'], expect:['25'],
+   hint:'The multiplication happens, but where does the result go?',
+   why:'A function without <code>return</code> gives back <code>None</code>. The value was computed, then thrown away.',
+   fixes:[{t:'return x * x',ok:1},{t:'print(x * x)'},{t:'yield x * x'},{t:'x *= x'}] },
+
+ { diff:'easy', file:'name.py', title:'Stubborn Strings',
+   brief:'Capitalise the first letter of "bob". Python says strings do not work that way.',
+   code:`name = "bob"
+name[0] = "B"
+print(name)`,
+   bug:1, buggy:['!TypeError: \'str\' object does not support item assignment'], expect:['Bob'],
+   hint:'Strings are immutable. You cannot change one character in place.',
+   why:'Strings cannot be edited in place. Build a new string instead: <code>"B" + name[1:]</code> glues a new first letter onto the rest.',
+   fixes:[{t:'name = "B" + name[1:]',ok:1},{t:'name.replace(0, "B")'},{t:'name.upper(0)'},{t:'name.replace("b", "B", 1)'}] },
+
+ /* ---------- MEDIUM ---------- */
+ { diff:'medium', file:'basket.py', title:'The Haunted Basket',
+   brief:'Each call should return a fresh basket with just the item. The second basket is haunted by the first.',
+   code:`def add_item(item, basket=[]):
+    basket.append(item)
+    return basket
+
+print(add_item("apple"))
+print(add_item("banana"))`,
+   bug:0, buggy:["['apple']","['apple', 'banana']"], expect:["['apple']","['banana']"],
+   hint:'Default argument values are created once, when the function is defined, not on every call.',
+   why:'The default <code>[]</code> is created once and shared across calls. Use <code>None</code> and build a new list inside the function.',
+   fixes:[{t:'def add_item(item, basket=None):\n    if basket is None:\n        basket = []',ok:1},{t:'def add_item(item, basket=list):'},{t:'def add_item(item, basket=[None]):'},{t:'def add_item(item, basket=()):'}] },
+
+ { diff:'medium', file:'average.py', title:'Rounded Down to Earth',
+   brief:'The average of 1, 2 and 4 is about 2.33. The function is being a little too generous with rounding.',
+   code:`def average(nums):
+    return sum(nums) // len(nums)
+
+print(average([1, 2, 4]))`,
+   bug:1, buggy:['2'], expect:['2.3333333333333335'],
+   hint:'Two slashes and one slash do very different things in Python 3.',
+   why:'<code>//</code> is floor division and throws away the decimals. <code>/</code> is true division.',
+   fixes:[{t:'return sum(nums) / len(nums)',ok:1},{t:'return sum(nums) % len(nums)'},{t:'return sum(nums) / len(nums) - 1'},{t:'return int(sum(nums) / len(nums))'}] },
+
+ { diff:'medium', file:'evens.py', title:'Cutting the Branch You Sit On',
+   brief:'Remove every even number from the list. Some evens are surviving the purge.',
+   code:`numbers = [2, 4, 6, 8, 3]
+for n in numbers:
+    if n % 2 == 0:
+        numbers.remove(n)
+print(numbers)`,
+   bug:1, buggy:['[4, 8, 3]'], expect:['[3]'],
+   hint:'What happens to the list indexes when you delete an item while the loop is still walking through it?',
+   why:'Removing items shifts the rest left, so the loop skips the next element. Iterating over a copy, <code>numbers[:]</code>, is safe.',
+   fixes:[{t:'for n in numbers[:]:',ok:1},{t:'for n in numbers[1:]:'},{t:'for n in len(numbers):'},{t:'for n in numbers:  # but go faster'}] },
+
+ { diff:'medium', file:'funcs.py', title:'The Lazy Lambdas',
+   brief:'Three functions should return 0, 1 and 2. They all return the same value.',
+   code:`funcs = []
+for i in range(3):
+    funcs.append(lambda: i)
+print([f() for f in funcs])`,
+   bug:2, buggy:['[2, 2, 2]'], expect:['[0, 1, 2]'],
+   hint:'The lambda looks up i when it is called, not when it is created.',
+   why:'Closures capture the variable, not its value. By the time they run, <code>i</code> is 2. A default argument <code>i=i</code> freezes the value at creation time.',
+   fixes:[{t:'funcs.append(lambda i=i: i)',ok:1},{t:'funcs.append(lambda: i + 1)'},{t:'funcs.append(lambda i: i)'},{t:'funcs.append(lambda: range(i))'}] },
+
+ { diff:'medium', file:'wordcount.py', title:'Word Counter Crash',
+   brief:'Count how many times each word appears. The program dies on the very first word.',
+   code:`text = "the cat and the hat"
+counts = {}
+for word in text.split():
+    counts[word] += 1
+print(counts)`,
+   bug:3, buggy:["!KeyError: 'the'"], expect:["{'the': 2, 'cat': 1, 'and': 1, 'hat': 1}"],
+   hint:'You cannot add 1 to a key that does not exist yet.',
+   why:'On first sight of a word there is no key to increment. <code>dict.get(word, 0)</code> supplies a default of 0.',
+   fixes:[{t:'counts[word] = counts.get(word, 0) + 1',ok:1},{t:'counts[word] =+ 1'},{t:'counts.add(word)'},{t:'counts[word] += counts[word]'}] },
+
+ { diff:'medium', file:'factorial.py', title:'Infinite Descent',
+   brief:'factorial(5) should be 120. Python gives up and throws an error instead.',
+   code:`def factorial(n):
+    if n == 0:
+        return 1
+    return n * factorial(n)
+
+print(factorial(5))`,
+   bug:3, buggy:['!RecursionError: maximum recursion depth exceeded'], expect:['120'],
+   hint:'The recursive call needs to move closer to the base case. Is it?',
+   why:'<code>factorial(n)</code> calls itself with the same value forever and never reaches 0. Calling <code>factorial(n - 1)</code> shrinks the problem.',
+   fixes:[{t:'return n * factorial(n - 1)',ok:1},{t:'return factorial(n - 1)'},{t:'return n * factorial(n + 1)'},{t:'return n * (n - 1)'}] },
+
+ { diff:'medium', file:'ranking.py', title:'Sorted... Into Nothing',
+   brief:'Find the top score. Python says the sorted list is not a list at all.',
+   code:`scores = [88, 92, 75]
+ranked = scores.sort(reverse=True)
+print(ranked[0])`,
+   bug:1, buggy:["!TypeError: 'NoneType' object is not subscriptable"], expect:['92'],
+   hint:'Some list methods change the list in place and return nothing.',
+   why:'<code>list.sort()</code> sorts in place and returns <code>None</code>. <code>sorted()</code> returns a new sorted list.',
+   fixes:[{t:'ranked = sorted(scores, reverse=True)',ok:1},{t:'ranked = scores.sorted(reverse=True)'},{t:'ranked = sort(scores, reverse=True)'},{t:'ranked = scores.reverse().sort()'}] },
+
+ /* ---------- HARD ---------- */
+ { diff:'hard', file:'floats.py', title:'Math Is Broken (It Is Not)',
+   brief:'0.1 + 0.2 should obviously equal 0.3. The program disagrees and so does your calculator... maybe.',
+   code:`total = 0.1 + 0.2
+if total == 0.3:
+    print("Math works!")
+else:
+    print("Floating point strikes again")`,
+   bug:1, buggy:['Floating point strikes again'], expect:['Math works!'],
+   hint:'Computers store decimals in binary, so some values are only approximations. Compare with a tolerance.',
+   why:'<code>0.1 + 0.2</code> is really <code>0.30000000000000004</code>. Compare floats by checking the difference is tiny.',
+   fixes:[{t:'if abs(total - 0.3) < 1e-9:',ok:1},{t:'if round(total) == 0.3:'},{t:'if total is 0.3:'},{t:'if str(total) == "0.3":'}] },
+
+ { diff:'hard', file:'search.py', title:'The Search That Never Ends',
+   brief:'Binary search should find 9 instantly. Instead the program hangs forever.',
+   code:`def binary_search(items, target):
+    low, high = 0, len(items) - 1
+    while low <= high:
+        mid = (low + high) // 2
+        if items[mid] == target:
+            return mid
+        elif items[mid] < target:
+            low = mid
+        else:
+            high = mid - 1
+    return -1
+
+print(binary_search([1, 3, 5, 7, 9], 9))`,
+   bug:7, buggy:['⏳ Program never finishes (infinite loop)'], expect:['4'],
+   hint:'After checking mid, you already know mid is not the answer. Does the search window shrink?',
+   why:'With <code>low = mid</code> the window can stop shrinking (low=3, high=4, mid=3 forever). Moving to <code>mid + 1</code> guarantees progress.',
+   fixes:[{t:'low = mid + 1',ok:1},{t:'high = mid + 1'},{t:'low = mid - 1'},{t:'low = mid * 2'}] },
+
+ { diff:'hard', file:'grid.py', title:'The Clone Army',
+   brief:'Set only the top-left cell to 1. Somehow every row changed.',
+   code:`grid = [[0] * 3] * 3
+grid[0][0] = 1
+print(grid)`,
+   bug:0, buggy:['[[1, 0, 0], [1, 0, 0], [1, 0, 0]]'], expect:['[[1, 0, 0], [0, 0, 0], [0, 0, 0]]'],
+   hint:'Multiplying a list copies the reference, not the list. How many different row objects exist?',
+   why:'<code>[row] * 3</code> repeats the <em>same</em> list three times. A list comprehension builds three separate rows.',
+   fixes:[{t:'grid = [[0] * 3 for _ in range(3)]',ok:1},{t:'grid = list([[0] * 3] * 3)'},{t:'grid = [[0 for _ in range(3)]] * 3'},{t:'grid = [[0, 0, 0]] * 3'}] },
+
+ { diff:'hard', file:'squares.py', title:'One-Shot Generator',
+   brief:'Sum the squares, then find the biggest. The second line blows up on perfectly good data.',
+   code:`squares = (x * x for x in range(4))
+print(sum(squares))
+print(max(squares))`,
+   bug:0, buggy:['14','!ValueError: max() iterable argument is empty'], expect:['14','9'],
+   hint:'Generators can only be consumed once. After sum() finishes, what is left?',
+   why:'A generator is exhausted after one pass. A list comprehension stores the values so you can use them again.',
+   fixes:[{t:'squares = [x * x for x in range(4)]',ok:1},{t:'squares = map(lambda x: x * x, range(4))'},{t:'squares = (x ** 2 for x in range(4))'},{t:'squares = iter([x * x for x in range(4)])'}] },
+
+ { diff:'hard', file:'pages.py', title:'The Missing Row',
+   brief:'Page 1 of size 3 should show D, E, F. The last item keeps vanishing.',
+   code:`def paginate(items, page, size):
+    start = page * size
+    end = start + size - 1
+    return items[start:end]
+
+print(paginate(list("ABCDEFGH"), 1, 3))`,
+   bug:2, buggy:["['D', 'E']"], expect:["['D', 'E', 'F']"],
+   hint:'Python slices include the start index but exclude the end index.',
+   why:'Slice ends are exclusive, so subtracting 1 drops the last item. <code>start + size</code> is the correct end.',
+   fixes:[{t:'end = start + size',ok:1},{t:'end = start + size + 1'},{t:'end = page * size'},{t:'end = size'}] }
+];
+
+/* ============ config ============ */
+const MODES = [
+  { id:'rookie',    em:'🌱', name:'Rookie',    desc:'Classic beginner traps. Good for warming up.', pick:()=>C.filter(c=>c.diff==='easy') },
+  { id:'engineer',  em:'⚙️', name:'Engineer',  desc:'Subtle bugs that bite real projects.',        pick:()=>C.filter(c=>c.diff==='medium') },
+  { id:'principal', em:'🧠', name:'Principal', desc:'Nasty gotchas even seniors miss.',            pick:()=>C.filter(c=>c.diff==='hard') },
+  { id:'mixed',     em:'🎲', name:'Mixed Bag', desc:'Eight random bugs from every level.',         pick:()=>shuffle(C).slice(0,8) }
+];
+const TIME = { easy:45, medium:60, hard:75 };
+const DM   = { easy:1,  medium:1.5, hard:2 };
+const HINT_COST = 30;
+
+/* ============ sound ============ */
+let AC, soundOn = store.get('bh_sound', true);
+function tone(f,d=.12,type='sine',v=.06,t0=0){
+  if(!soundOn) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const t=AC.currentTime+t0, o=AC.createOscillator(), g=AC.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t+d+.03);
+  }catch(e){}
+}
+const sfx = {
+  click:()=>tone(520,.06,'triangle',.04),
+  ok:()=>{tone(660,.1,'triangle');tone(990,.16,'triangle',.06,.09)},
+  bad:()=>tone(170,.28,'sawtooth',.05),
+  win:()=>[523,659,784,1047].forEach((f,i)=>tone(f,.2,'triangle',.06,i*.1)),
+  lose:()=>[392,330,262,196].forEach((f,i)=>tone(f,.25,'sawtooth',.04,i*.14))
+};
+function paintSound(){ $('#soundBtn').textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off'; }
+
+/* ============ syntax highlight ============ */
+const KW = new Set(['def','return','for','in','if','elif','else','while','import','from','as','class','lambda','not','and','or','is','None','True','False','yield','pass','break','continue','try','except','with']);
+const BI = new Set(['print','range','len','sum','max','min','str','int','float','list','sorted','abs','round','set','dict','map','iter','type']);
+function hl(line){
+  const re=/(#.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d+(?:\.\d+)?(?:e-?\d+)?\b)|([A-Za-z_]\w*)|(\s+|[\s\S])/g;
+  let out='', m, prev='';
+  while((m=re.exec(line))){
+    if(m[1]){ out+=`<span class="c">${esc(m[1])}</span>`; prev=''; }
+    else if(m[2]){ out+=`<span class="s">${esc(m[2])}</span>`; prev=''; }
+    else if(m[3]){ out+=`<span class="n">${esc(m[3])}</span>`; prev=''; }
+    else if(m[4]){
+      const w=m[4]; let cls='';
+      if(KW.has(w)) cls='k';
+      else if(prev==='def') cls='f';
+      else if(BI.has(w)) cls='b';
+      else if(line[re.lastIndex]==='(') cls='fn';
+      out+= cls?`<span class="${cls}">${w}</span>`:w;
+      prev=w;
+    } else { out+=esc(m[5]); if(m[5].trim()!=='') prev=''; }
+  }
+  return out || ' ';
+}
+
+/* ============ confetti ============ */
+const cv=$('#fx'), cx=cv.getContext('2d'); let parts=[], raf=0;
+const dpr=Math.min(window.devicePixelRatio||1,2);
+function sizeFx(){ cv.width=innerWidth*dpr; cv.height=innerHeight*dpr; }
+addEventListener('resize',sizeFx); sizeFx();
+function confetti(n=110,x=.5,y=.4){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cols=['#4cc9f0','#7c5cff','#ff7ad9','#2ee59d','#ffc857','#ffffff'];
+  for(let i=0;i<n;i++) parts.push({
+    x:x*cv.width, y:y*cv.height,
+    vx:(Math.random()-.5)*15*dpr, vy:(-Math.random()*13-3)*dpr,
+    s:(5+Math.random()*6)*dpr, c:cols[i%cols.length], r:Math.random()*6, vr:(Math.random()-.5)*.4, life:1
+  });
+  if(!raf) loop();
+}
+function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts=parts.filter(p=>p.life>0&&p.y<cv.height+40);
+  for(const p of parts){
+    p.vy+=.38*dpr; p.x+=p.vx; p.y+=p.vy; p.vx*=.99; p.r+=p.vr; p.life-=.009;
+    cx.save(); cx.translate(p.x,p.y); cx.rotate(p.r); cx.globalAlpha=Math.max(p.life,0);
+    cx.fillStyle=p.c; cx.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6); cx.restore();
+  }
+  if(parts.length) raf=requestAnimationFrame(loop); else { raf=0; cx.clearRect(0,0,cv.width,cv.height); }
+}
+
+/* ============ state ============ */
+let S = null, cur = null, selMode = store.get('bh_mode','rookie');
+let toastT;
+function toast(msg,kind=''){
+  const t=$('#toast'); t.textContent=msg; t.className='show '+kind;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.className='',1900);
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  $('#quitBtn').classList.toggle('hidden', id!=='game');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ============ start screen ============ */
+function renderModes(){
+  $('#modes').innerHTML = MODES.map(m=>{
+    const n = m.id==='mixed' ? 8 : m.pick().length;
+    const t = m.id==='rookie'?'45s':m.id==='engineer'?'60s':m.id==='principal'?'75s':'45-75s';
+    return `<button class="mode ${m.id===selMode?'sel':''}" data-id="${m.id}">
+      <div class="em">${m.em}</div><h3>${m.name}</h3><p>${m.desc}</p>
+      <div class="meta">${n} bugs · ${t} each</div></button>`;
+  }).join('');
+}
+$('#modes').addEventListener('click',e=>{
+  const b=e.target.closest('.mode'); if(!b) return;
+  selMode=b.dataset.id; store.set('bh_mode',selMode); sfx.click(); renderModes();
+});
+$('#startBtn').addEventListener('click',()=>startGame(selMode));
+$('#soundBtn').addEventListener('click',()=>{ soundOn=!soundOn; store.set('bh_sound',soundOn); paintSound(); sfx.click(); });
+$('#quitBtn').addEventListener('click',()=>{ stopTimer(); show('start'); paintBest(); });
+function paintBest(){ $('#bestScore').textContent = store.get('bh_best',0); }
+
+/* ============ game flow ============ */
+function startGame(modeId){
+  const mode = MODES.find(m=>m.id===modeId);
+  S = { mode, queue:mode.pick(), i:0, score:0, lives:3, streak:0, bestStreak:0, solved:0, hints:0,
+        results:[], phase:'spot', lines:[], focus:-1, fixRange:null, tid:null, left:0, total:0,
+        opts:[], hint1:false, hint2:false, mistakes:0 };
+  show('game'); sfx.click(); loadRound();
+}
+function loadRound(){
+  cur = S.queue[S.i];
+  S.phase='spot'; S.lines=cur.code.split('\n'); S.focus=-1; S.fixRange=null;
+  S.hint1=false; S.hint2=false; S.mistakes=0; S.opts=[];
+  $('#fileName').textContent=cur.file;
+  $('#mTitle').textContent=cur.title; $('#mBrief').textContent=cur.brief;
+  for(const id of ['#diffTag','#diffTag2']){ const d=$(id); d.textContent=cur.diff; d.className='diff '+cur.diff; }
+  $('#nextBtn').classList.add('hidden'); $('#hintBtn').classList.remove('hidden'); $('#hintBtn').disabled=false;
+  renderCode(); renderTerm(false); renderStage(); renderHud(); startTimer();
+}
+function renderHud(){
+  $('#roundTxt').textContent=`${S.i+1} / ${S.queue.length}`;
+  $('#scoreTxt').textContent=S.score;
+  $('#streakTxt').textContent='x'+(1+Math.min(S.streak,10)*.1).toFixed(1);
+  $('#hearts').innerHTML=[0,1,2].map(i=>i<S.lives?'❤️':'🖤').join(' ');
+  $('#hintBtn').textContent=`💡 Hint (−${HINT_COST})`;
+}
+function bump(sel){ const el=$(sel); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+
+function renderCode(){
+  const box=$('#code'); box.className=S.phase;
+  box.innerHTML=S.lines.map((l,i)=>{
+    let cls='line';
+    if(S.fixRange && i>=S.fixRange[0] && i<=S.fixRange[1]) cls+=' fixed';
+    else if(S.phase==='fix' && i===cur.bug) cls+=' bug';
+    if(i===S.focus && S.phase==='spot') cls+=' focus';
+    return `<div class="${cls}" data-i="${i}" role="button" aria-label="Line ${i+1}"><span class="ln">${i+1}</span><span class="src">${hl(l)}</span></div>`;
+  }).join('');
+  $('#phaseTag').textContent = S.phase==='spot' ? '🔎 Find the buggy line' : S.phase==='fix' ? '🛠 Choose the fix' : (S.fixRange?'✅ Patched':'');
+}
+$('#code').addEventListener('click',e=>{
+  const l=e.target.closest('.line'); if(l) pickLine(+l.dataset.i);
+});
+
+function renderTerm(solved){
+  const act = solved ? cur.expect : cur.buggy;
+  const row=(l,i)=>`<div class="ol ${l[0]==='!'?'err':''}" style="animation-delay:${i*130}ms">${esc(l[0]==='!'?l.slice(1):l)}</div>`;
+  $('#term').innerHTML=`<div class="bar"><i></i><i></i><i></i><span>$ python ${cur.file}</span></div>
+    <div class="term-b">
+      <div class="tag ${solved?'ok':'bad'}">${solved?'✔ Output after your fix':'✘ Actual output'}</div>
+      ${act.map(row).join('')}
+      <div class="tag exp">✔ Expected output</div>
+      ${cur.expect.map(row).join('')}
+    </div>`;
+}
+
+function renderStage(extra=''){
+  const st=$('#stage');
+  if(S.phase==='spot'){
+    st.innerHTML=`<div class="prompt"><span class="step">1</span><div><b>Spot the bug.</b> Click the line of code that's causing the problem.<small>Keyboard: <span class="kbd">↑</span> <span class="kbd">↓</span> to move, <span class="kbd">Enter</span> to pick</small></div></div>`
+      +(S.hint1?`<div class="hintbox">💡 ${esc(cur.hint)}</div>`:'')+extra;
+  } else if(S.phase==='fix'){
+    st.innerHTML=`<div class="prompt"><span class="step">2</span><div><b>Nice catch!</b> Now pick the fix that makes the program behave.<small>Press <span class="kbd">1</span>–<span class="kbd">4</span> to choose</small></div></div>
+      <div class="opts">${S.opts.map((o,i)=>`<button class="opt ${o.state}" data-i="${i}" ${o.state?'disabled':''}>
+        <span class="key">${i+1}</span><pre>${o.t.split('\n').map(hl).join('\n')}</pre></button>`).join('')}</div>`+extra;
+  } else {
+    st.innerHTML=extra;
+  }
+}
+$('#stage').addEventListener('click',e=>{
+  const b=e.target.closest('.opt'); if(b && !b.disabled) pickFix(+b.dataset.i);
+});
+
+/* ---- timer ---- */
+function startTimer(){
+  stopTimer(); S.total=TIME[cur.diff]; S.left=S.total; paintTimer();
+  S.tid=setInterval(()=>{
+    if(document.hidden || S.phase==='done') return;
+    S.left=Math.max(0,S.left-.1); paintTimer();
+    if(S.left<=0) timeUp();
+  },100);
+}
+function stopTimer(){ if(S && S.tid){ clearInterval(S.tid); S.tid=null; } }
+function paintTimer(){
+  const p=S.left/S.total;
+  $('#timerFill').style.width=(p*100)+'%';
+  $('#timeTxt').textContent=Math.ceil(S.left)+'s';
+  const t=$('#timer'); t.classList.toggle('warn',p<.5&&p>=.25); t.classList.toggle('crit',p<.25);
+}
+
+/* ---- scoring ---- */
+function award(base){
+  const pts=Math.round(base*DM[cur.diff]*(1+Math.min(S.streak,10)*.1));
+  S.score+=pts; S.streak++; S.bestStreak=Math.max(S.bestStreak,S.streak);
+  return pts;
+}
+function loseLife(msg){
+  S.lives--; S.streak=0; S.mistakes++; sfx.bad();
+  $('#editorCard').classList.remove('shake'); void $('#editorCard').offsetWidth; $('#editorCard').classList.add('shake');
+  renderHud(); toast(msg,'bad');
+  if(S.lives<=0){ failRound('lives'); return true; }
+  return false;
+}
+
+/* ---- spot phase ---- */
+function pickLine(i){
+  if(S.phase!=='spot') return;
+  if(i===cur.bug){
+    const pts=award(40);
+    S.phase='fix'; S.focus=-1;
+    S.opts=shuffle(cur.fixes).map(f=>({t:f.t,ok:!!f.ok,state:''}));
+    sfx.ok(); confetti(26,.3,.35); renderHud(); bump('#scoreTxt');
+    toast(`🐞 Bug located! +${pts}`,'good');
+    renderCode(); renderStage();
+  } else {
+    const el=$(`.line[data-i="${i}"]`); el.classList.add('wrong'); setTimeout(()=>el&&el.classList.remove('wrong'),450);
+    loseLife(`Line ${i+1} is fine. −1 ❤️`);
+  }
+}
+
+/* ---- fix phase ---- */
+function applyFix(fix){
+  const indent=S.lines[cur.bug].match(/^\s*/)[0];
+  const nl=fix.t.split('\n').map(l=>indent+l);
+  S.lines.splice(cur.bug,1,...nl);
+  S.fixRange=[cur.bug,cur.bug+nl.length-1];
+}
+function pickFix(i){
+  if(S.phase!=='fix') return;
+  const o=S.opts[i]; if(!o||o.state) return;
+  if(o.ok){
+    stopTimer();
+    const bonus=Math.floor((S.left/S.total)*50*DM[cur.diff]);
+    const pts=award(60)+bonus;
+    S.score+=bonus; S.solved++; o.state='right'; S.phase='done';
+    S.results.push({title:cur.title,res:'ok',mistakes:S.mistakes});
+    applyFix(o); renderCode(); renderTerm(true); renderHud(); bump('#scoreTxt'); bump('#streakTxt');
+    sfx.win(); confetti(140);
+    toast(`✅ Fixed! +${pts} (time bonus +${bonus})`,'good');
+    endRoundUI(`<div class="why"><b>✅ Why this works</b>${cur.why}</div>`);
+  } else {
+    o.state='wrong'; renderStage();
+    loseLife('Not quite. −1 ❤️');
+    if(S.phase==='fix') renderStage();
+  }
+}
+
+/* ---- ending a round ---- */
+function endRoundUI(html){
+  const last = S.i>=S.queue.length-1 || S.lives<=0;
+  $('#stage').innerHTML=html;
+  $('#hintBtn').classList.add('hidden');
+  const nb=$('#nextBtn'); nb.textContent= last ? 'See results →' : 'Next bug →'; nb.classList.remove('hidden');
+  setTimeout(()=>nb.focus({preventScroll:true}),50);
+}
+function failRound(reason){
+  stopTimer();
+  S.phase='done';
+  S.results.push({title:cur.title,res:'fail',mistakes:S.mistakes});
+  const correct=cur.fixes.find(f=>f.ok); applyFix(correct);
+  renderCode(); renderHud();
+  const head = reason==='time' ? "⏰ Time's up!" : reason==='lives' ? '💔 Out of lives' : 'Missed it';
+  if(reason==='lives') sfx.lose();
+  endRoundUI(`<div class="why fail"><b>${head} Here's what was wrong</b>The fix was <code>${esc(correct.t.split('\n')[0])}</code>${correct.t.includes('\n')?' (plus a few lines)':''}.<br><br>${cur.why}</div>`);
+}
+function timeUp(){
+  if(S.phase==='done') return;
+  stopTimer();
+  S.lives--; S.streak=0; sfx.bad(); renderHud();
+  toast("⏰ Time's up! −1 ❤️",'bad');
+  failRound(S.lives<=0?'lives':'time');
+}
+$('#nextBtn').addEventListener('click',nextRound);
+function nextRound(){
+  if(S.phase!=='done') return;
+  sfx.click();
+  if(S.lives<=0 || S.i>=S.queue.length-1) return endGame();
+  S.i++; loadRound();
+}
+
+/* ---- hints ---- */
+$('#hintBtn').addEventListener('click',useHint);
+function useHint(){
+  if(!S||S.phase==='done'||$('#game').classList.contains('active')===false) return;
+  if(S.phase==='spot'){
+    if(S.hint1) return toast('Hint already revealed');
+    S.hint1=true;
+  } else if(S.phase==='fix'){
+    if(S.hint2) return toast('Already narrowed down');
+    S.hint2=true;
+    const wrong=S.opts.map((o,i)=>({o,i})).filter(x=>!x.o.ok&&!x.o.state);
+    shuffle(wrong).slice(0,2).forEach(x=>x.o.state='out');
+  }
+  S.hints++; S.score=Math.max(0,S.score-HINT_COST); sfx.click(); renderHud(); bump('#scoreTxt');
+  toast(`💡 Hint used (−${HINT_COST})`);
+  renderStage();
+}
+
+/* ---- end screen ---- */
+function rankFor(ratio,flawless){
+  if(ratio>=1 && flawless) return {em:'🏆',name:'Bug Slayer Legend',msg:'Flawless. Production is safe because of you.'};
+  if(ratio>=.8) return {em:'🥷',name:'Debug Ninja',msg:'Silent, deadly, and always on time.'};
+  if(ratio>=.5) return {em:'🕵️',name:'Code Detective',msg:'Solid instincts. A few more cases and you will be unstoppable.'};
+  return {em:'🌱',name:'Bug Rookie',msg:'Every senior dev has shipped these bugs. Run it back!'};
+}
+function endGame(){
+  stopTimer();
+  const total=S.queue.length, ratio=S.solved/total, flawless=S.lives===3 && S.hints===0;
+  const r=rankFor(ratio,flawless);
+  const best=store.get('bh_best',0), isBest=S.score>best && S.score>0;
+  if(isBest) store.set('bh_best',S.score);
+  const attempted=S.results.length;
+  const acc=attempted?Math.round(S.solved/attempted*100):0;
+  const died=S.lives<=0;
+  $('#endBox').innerHTML=`
+    <div class="rank-em">${r.em}</div>
+    <h2>${r.name}</h2>
+    <p class="sub">${died?'You ran out of lives. ':''}${r.msg}</p>
+    ${isBest?'<div class="newbest">🎉 New personal best!</div>':''}
+    <div class="big grad">${S.score}</div>
+    <div class="sub" style="margin:0">points · ${S.mode.name} mode</div>
+    <div class="stats">
+      <div class="stat"><b>${S.solved}/${total}</b><span>Bugs fixed</span></div>
+      <div class="stat"><b>${acc}%</b><span>Accuracy</span></div>
+      <div class="stat"><b>${S.bestStreak}🔥</b><span>Best streak</span></div>
+      <div class="stat"><b>${S.hints}</b><span>Hints used</span></div>
+    </div>
+    <div class="rounds">${S.queue.map((c,i)=>{
+      const x=S.results[i];
+      return `<div class="rd"><span class="ic">${x?(x.res==='ok'?'✅':'❌'):'⬜'}</span>${esc(c.title)}<small>${c.file}${x&&x.res==='ok'&&x.mistakes?` · ${x.mistakes} slip${x.mistakes>1?'s':''}`:''}</small></div>`;
+    }).join('')}</div>
+    <div class="end-actions">
+      <button class="btn primary" id="againBtn">↻ Play again</button>
+      <button class="btn ghost" id="shareBtn">📋 Copy my result</button>
+      <button class="btn ghost" id="menuBtn">☰ Change mode</button>
+    </div>`;
+  show('end');
+  if(ratio>=.5){ sfx.win(); confetti(220,.5,.3); setTimeout(()=>confetti(120,.2,.4),250); setTimeout(()=>confetti(120,.8,.4),400); }
+  $('#againBtn').onclick=()=>startGame(S.mode.id);
+  $('#menuBtn').onclick=()=>{ show('start'); paintBest(); };
+  $('#shareBtn').onclick=()=>{
+    const row=S.queue.map((c,i)=>S.results[i]?(S.results[i].res==='ok'?'🟩':'🟥'):'⬜').join('');
+    const txt=`🐞 BugHunter · ${S.mode.name}\n${r.em} ${r.name} — ${S.score} pts\n${row}\nFixed ${S.solved}/${total} · Best streak ${S.bestStreak}`;
+    (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Result copied!','good'))
+      .catch(()=>{ const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); try{document.execCommand('copy');toast('Result copied!','good');}catch(e){toast('Could not copy');} t.remove(); });
+  };
+}
+
+/* ============ keyboard ============ */
+addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const inGame=$('#game').classList.contains('active');
+  const inStart=$('#start').classList.contains('active');
+  if(inStart){ if(e.key==='Enter'){ e.preventDefault(); startGame(selMode); } return; }
+  if(!inGame||!S) return;
+  const k=e.key;
+  if(S.phase==='spot'){
+    if(k==='ArrowDown'||k==='ArrowUp'){
+      e.preventDefault();
+      const n=S.lines.length;
+      S.focus = S.focus<0 ? (k==='ArrowDown'?0:n-1) : (S.focus+(k==='ArrowDown'?1:-1)+n)%n;
+      renderCode(); sfx.click();
+    } else if((k==='Enter'||k===' ') && S.focus>=0){ e.preventDefault(); pickLine(S.focus); }
+  } else if(S.phase==='fix'){
+    if(/^[1-4]$/.test(k)) pickFix(+k-1);
+  } else if(S.phase==='done'){
+    if(k==='Enter'||k==='n'||k==='N'){ e.preventDefault(); nextRound(); }
+  }
+  if((k==='h'||k==='H') && S.phase!=='done') useHint();
+});
+
+/* ============ boot ============ */
+paintSound(); renderModes(); paintBest();
+</script>
+</body>
+</html>
